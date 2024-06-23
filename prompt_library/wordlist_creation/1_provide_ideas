@@ -1,0 +1,10 @@
+	Please provide me with a list of at least 10 ideas that are informed by the given information. Think like a web developer, considering web technologies and hosting on the server listed below. Suggest the most complex web path that could possibly be used. The suggested path should align with the technology used by the targeted web services. For example, raw PHP will use PHP files as the path and end with .php. Please ensure to format your output as a code block using triple backticks (json). Inner thought process:
+	It's crucial to explore new ideas and think outside the box. This can be achieved by incorporating concepts from the "Concepts" section and establishing connections between them.
+	By reusing concepts and using multiple concepts per idea, creativity can thrive.
+	Although ideas may seem unconventional or out of this world, it is still valuable to consider them.
+	To ensure practicality, reasons for the ideas should be provided, and existing ideas can be combined in unique ways to experiment.
+	While immediate applicability is not necessary, it is crucial to ensure that the ideas can eventually be put into practice.
+	Finally, the outputted ideas should be in JSON format.
+Hosting:
+Server:
+Wordlist idea:

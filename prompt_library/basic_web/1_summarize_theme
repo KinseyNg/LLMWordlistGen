@@ -1,0 +1,9 @@
+	You are the programmer of the website. Given the HTML codes below, 
+consider the following questions and generate ideas based on these questions.
+	"What are the basic features of the website?"
+    "Classiify the website theme"
+    "Summarize the website techincal usage/techincal features"
+    "List out all the name whatever in urls, vairalbes, classes , functions that can be used to identify anything"
+
+
+Showing the results in JSON format.
