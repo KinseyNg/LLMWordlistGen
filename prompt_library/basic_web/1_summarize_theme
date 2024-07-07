@@ -3,7 +3,7 @@ consider the following questions and generate ideas based on these questions.
 	"What are the basic features of the website?"
     "Classiify the website theme"
     "Summarize the website techincal usage/techincal features"
-    "List out all the name whatever in urls, vairalbes, classes , functions that can be used to identify anything"
+    "List out all the name whatever in urls, vairalbes, classes , functions that can be used to identify anything, no need to return any description of the empty resutls"
 
 
-Showing the results in JSON format.
+Showing the results in JSON format ONLY.

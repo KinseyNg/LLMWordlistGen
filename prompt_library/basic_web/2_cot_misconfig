@@ -5,4 +5,4 @@ What is the database used? What are the web technologies used? If a web programm
 
 What is the procedure from zero to complete the website? What administrative functions need to be included to allow administrators to use the website? This includes the web administration portal, server portal, and any other related functionalities."
 
-Using Given the list of URLs, understand the URL structure and suggest the possible web framework used.
+Return the result in JSON format ONLY!

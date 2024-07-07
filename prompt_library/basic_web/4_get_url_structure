@@ -1,0 +1,3 @@
+
+Using Given the list of URLs and the HTML codes containing the URLs, understand the URL structure and suggest the possible web framework used. E.g MVC / MVVM / No URL structure, also suggest the path structure , e.g. /{object}/{id} or /{object}.php?{id} or other.
+Must return result in JSON format only. 
