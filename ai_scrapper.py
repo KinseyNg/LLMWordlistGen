@@ -114,6 +114,9 @@ def read_prompt(mode, type_text, item, source, data_list=[]):
             return None
         
         combined_content = file_content + source
+        if debugging_enabled:
+            st.write("Input to LLM:", combined_content)
+            #st.write("Respose : ", response)
         response = run_with_error_handling(combined_content)
 
     elif mode == "exe_all":
@@ -131,8 +134,7 @@ def read_prompt(mode, type_text, item, source, data_list=[]):
         st.write(combined_prompts)
         
         response = run_with_error_handling(combined_prompts)
-    if debugging_enabled:
-            st.write("Input to LLM:", prompt)
+
     return response
 
 # Function to clean the summarized result and remove non-JSON parts
@@ -316,16 +318,18 @@ if openai_access_token:
                     with open(os.path.join(root, file), "r") as f:
                         scrapped_html += f.read()
 
-            url_structure_result = read_prompt("exe_one", "basic_web", "4_guess_url_structure", "Framework found by wappalyzer : " + str(wappalyzer_return) + " summarized URL Structure : " + ', '.join(result["URL"]) + ", All the HTML files captured : " + scrapped_html, "")  
+            url_structure_result = read_prompt("exe_one", "basic_web", "4_get_url_structure", "Framework found by wappalyzer : " + str(wappalyzer_return) + " summarized URL Structure : " + ', '.join(result["URL"]) + ", All the HTML files captured : " + scrapped_html, "")  
             # Check if url_structure_result is None before concatenating
             if url_structure_result is not None:
                 st.write("url_structure_result : " + url_structure_result)
+                url_structure_result_clean = clean_summary(url_structure_result)
                 with open(url_structure_path, "w") as f:
                     f.write(url_structure_result_clean)
                     st.write("Saved URL Structure results in " + url_structure_path)
+                    
             else:
                 st.write("url_structure_result is None")
-            url_structure_result_clean = clean_summary(url_structure_result)
+            
             
         else:
             url_structure_result = open(url_structure_path, 'r').read()

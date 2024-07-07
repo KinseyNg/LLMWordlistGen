@@ -1,3 +1,6 @@
 
-Using Given the list of URLs and the HTML codes containing the URLs, understand the URL structure and suggest the possible web framework used. E.g MVC / MVVM / No URL structure, also suggest the path structure , e.g. /{object}/{id} or /{object}.php?{id} or other.
+Using Given the list of URLs and the HTML codes containing the URLs,based on the detected technologies used, and understand the URL structure and suggest the possible web framework used. E.g MVC / MVVM / No URL structure, give a list of URL that would  suggest the path structure for covering all resource on the website, 
+
+Suggest the web architectures 
+e.g. /{object}/{id} or /{object}.php?{id}, /{features}.php (if php or other) or other.
 Must return result in JSON format only. 
