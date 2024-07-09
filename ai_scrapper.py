@@ -14,6 +14,7 @@ import difflib
 from dotenv import load_dotenv
 import json
 import shutil
+import concurrent.futures
 
 # Load the .env file
 load_dotenv()
@@ -22,7 +23,7 @@ load_dotenv()
 api_key = os.getenv("API_KEY")
 
 PRODUCTION = True
-debugging_enabled = True
+debugging_enabled = False
 
 
 def fetch_html(url):
@@ -157,6 +158,26 @@ def clean_summary(result):
 # Get OpenAI API key from user
 openai_access_token = api_key
 openai_api_key = openai_access_token
+
+def repair_and_load_json(json_str, min_length=10):
+    """
+    Attempts to repair an incomplete JSON string by progressively removing characters from the end
+    until the string can be successfully decoded or becomes shorter than min_length.
+    
+    Parameters:
+    - json_str: The JSON string to repair and decode.
+    - min_length: The minimum length of the string to attempt decoding. Prevents infinite loop.
+    
+    Returns:
+    - A Python object decoded from the repaired JSON string, or None if repair was unsuccessful.
+    """
+    while len(json_str) > min_length:
+        try:
+            return json.loads(json_str)
+        except json.JSONDecodeError:
+            # Remove the last character and try again
+            json_str = json_str[:-1]
+    return None  # Return None if unable to repair
 
 def generate_response(input_text):
     llm = OpenAI(temperature=0.7, openai_api_key=openai_access_token)
@@ -339,7 +360,7 @@ if openai_access_token:
         st.write("Step 8 : Run OWASP check")
         owasp_path = f'{newpath}/owasp_results'
         if not os.path.exists(owasp_path):
-            owasp_result = read_prompt("exe_one", "basic_web", "3_OWASP", "Framework used by wappalyzer : " + str(wappalyzer_return) + " Website Technologies information : " + cot_result, "")  
+            owasp_result = read_prompt("exe_one", "basic_web", "3_OWASP", "Framework used by wappalyzer : " + str(wappalyzer_return) + " Website Technologies information : " + cot_result + "summarized information : " + summarized_result_clean, "")  
             owasp_result_clean = clean_summary(owasp_result)
             with open(owasp_path, "w") as f:
                 f.write(owasp_result_clean)
@@ -348,6 +369,46 @@ if openai_access_token:
             owasp_result = open(owasp_path, 'r').read()
         st.write(owasp_result)
 
+
+
+
+        if PRODUCTION:
+            with open("./prompt_library/wordlist_creation/1_provide_ideas", 'r') as f:
+                wordpressprompt = f.read()
+            combined_result = summarized_result + "\n" + cot_result + "\n" + owasp_result
+            general_ideas = hn_assistant.run(wordpressprompt + combined_result, stream=False)
+            st.write("Generating Ideas")
+            st.write(general_ideas)
+            # Store the general ideas result
+            with open(f"{newpath}/general_ideas_result.txt", "w") as f:
+                #Clean to pure JSON before write
+                general_ideas = general_ideas
+                f.write(general_ideas)
+            
+            with open("./prompt_library/wordlist_creation/2_suggests_filepath", 'r') as f:
+                wordlistprompt = f.read()
+            wordlistoutput = hn_assistant.run("Return plaintext list of URL only, no description : " + wordlistprompt + general_ideas, stream=False)
+            st.write("Generating Wordlist")
+            st.write(wordlistoutput)
+            #Clean the wordlistoutput to JSON only
+            wordlistoutput_clean = wordlistoutput
+            # Store the wordlist output
+            with open(f"{newpath}/wordlist_output.txt", "w") as f:
+                f.write(wordlistoutput_clean)
+        else:
+            # Read the existing general ideas result
+            with open(f"{newpath}/general_ideas_result.txt", "r") as f:
+                general_ideas = f.read()
+            st.write("Generating Ideas")
+            st.write(general_ideas)
+            
+            # Read the existing wordlist output
+            with open(f"{newpath}/wordlist_output.txt", "r") as f:
+                wordlistoutput = f.read()
+            st.write("Generating Wordlist")
+            st.write(wordlistoutput)      
+    
+
         st.write("Step 8 : Wordlist Creator")
         
         software_list = [folder for folder in os.listdir('./prompt_library') if os.path.isdir(os.path.join('./prompt_library', folder))]
@@ -355,9 +416,9 @@ if openai_access_token:
         
         matched_software = check_software_in_json(wappalyzer_return, software_list)
 
-
+        #If matched found, then run the prompt for the software for seeder
         if matched_software:
-            st.write("Matched Software:")
+            st.write("Matched Software to start seeder:")
             st.write(matched_software)
             for software in matched_software.keys():
                 st.write(f"Running prompts for {software}...")
@@ -389,35 +450,193 @@ if openai_access_token:
         
         else:
             st.write("No matched software found in Wappalyzer return.")
-        if PRODUCTION:
-            with open("./prompt_library/wordlist_creation/1_provide_ideas", 'r') as f:
-                wordpressprompt = f.read()
-            combined_result = summarized_result + "\n" + cot_result + "\n" + owasp_result
-            general_ideas = hn_assistant.run(wordpressprompt + combined_result, stream=False)
-            st.write("Generating Ideas")
-            st.write(general_ideas)
-            # Store the general ideas result
-            with open(f"{newpath}/general_ideas_result.txt", "w") as f:
-                f.write(general_ideas)
-            
-            with open("./prompt_library/wordlist_creation/2_suggests_filepath", 'r') as f:
-                wordlistprompt = f.read()
-            wordlistoutput = hn_assistant.run(wordlistprompt + general_ideas, stream=False)
-            st.write("Generating Wordlist")
-            st.write(wordlistoutput)
-            # Store the wordlist output
-            with open(f"{newpath}/wordlist_output.txt", "w") as f:
-                f.write(wordlistoutput)
-        else:
-            # Read the existing general ideas result
-            with open(f"{newpath}/general_ideas_result.txt", "r") as f:
-                general_ideas = f.read()
-            st.write("Generating Ideas")
-            st.write(general_ideas)
-            
-            # Read the existing wordlist output
-            with open(f"{newpath}/wordlist_output.txt", "r") as f:
-                wordlistoutput = f.read()
-            st.write("Generating Wordlist")
-            st.write(wordlistoutput)      
+        
+        
+        
+        st.write("Step 10 : Combined the generated wordlist and do the first execution")
+        combined=wordlistoutput+general_ideas
+        st.write(combined)
+
+
+       
+        st.write("Step 11: Check if the URLs exist (using multithreading)")
+
+        # Using the combined variable, read the record one by one and combine with the domain name, try the URLs to see if they exist, save it as JSON format
+
+        # Split the combined wordlist into individual URLs
+        wordlist_urls = combined.split()
+
+        # Initialize the results dictionary
+        results = {"existing_urls": [], "non_existing_urls": []}
+
+        # Function to check if a URL exists
+        def check_url_existence(path):
+            full_url = f"http://{base_domain}/{path.lstrip('/')}"
+            try:
+                response = requests.head(full_url, timeout=5)
+                if response.status_code == 200:
+                    return full_url, True
+                else:
+                    return full_url, False
+            except requests.RequestException:
+                return full_url, False
+
+        # Create a progress bar
+        progress_bar = st.progress(0)
+        total_urls = len(wordlist_urls)
+
+        # Use ThreadPoolExecutor to check URLs concurrently
+        with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
+            future_to_url = {executor.submit(check_url_existence, path): path for path in wordlist_urls}
+            for idx, future in enumerate(concurrent.futures.as_completed(future_to_url)):
+                url, exists = future.result()
+                if exists:
+                    results["existing_urls"].append(url)
+                else:
+                    results["non_existing_urls"].append(url)
+                # Update progress bar
+                progress_bar.progress((idx + 1) / total_urls)
+
+        # Save the results to a file
+        results_filename = f"{newpath}/url_existence_results.json"
+        with open(results_filename, "w") as f:
+            json.dump(results, f, indent=4)
+
+        # Save the successful URLs to a separate file
+        successful_urls_filename = f"{newpath}/successful_urls.txt"
+        with open(successful_urls_filename, "w") as f:
+            for url in results["existing_urls"]:
+                f.write(url + "\n")
+
+        # Save the unsuccessful URLs to a separate file
+        unsuccessful_urls_filename = f"{newpath}/unsuccessful_urls.txt"
+        with open(unsuccessful_urls_filename, "w") as f:
+            for url in results["non_existing_urls"]:
+                f.write(url + "\n")
+
+        # Save the number of successful and unsuccessful URLs to a separate file
+        summary_filename = f"{newpath}/url_check_summary.json"
+        summary = {
+            "successful_count": len(results["existing_urls"]),
+            "unsuccessful_count": len(results["non_existing_urls"])
+        }
+        with open(summary_filename, "w") as f:
+            json.dump(summary, f, indent=4)
+
+        st.write("URL existence checking completed.")
+        st.write(f"Results saved in {results_filename}")
+        st.write(f"Successful URLs saved in {successful_urls_filename}")
+        st.write(f"Unsuccessful URLs saved in {unsuccessful_urls_filename}")
+        st.write(f"Summary saved in {summary_filename}")
+
+        # List out the found URLs
+        st.write("Existing URLs:")
+        for url in results["existing_urls"]:
+            st.write(url)
+
+        st.write("Non-Existing URLs:")
+        for url in results["non_existing_urls"]:
+            st.write(url)
+
+
+                
+        # Step 12: Analyze the subfolders found and run recursive scanning (TBC)
+        st.write("Step 12: Analyze subfolders and run recursive scanning")
+
+        # Function to generate wordlist from subfolders and current folder variations
+        def generate_wordlist_from_existing_urls(base_urls):
+            wordlist = set()
+            for url in base_urls:
+                parsed_url = urlparse(url)
+                path_parts = parsed_url.path.strip("/").split("/")
+                if len(path_parts) > 1:
+                    subfolder = "/".join(path_parts[:-1])
+                    wordlist.add(subfolder)
+                # Add variations in the current folder
+                wordlist.add(parsed_url.path.strip("/"))
+                wordlist.add(parsed_url.path.strip("/") + "/index.html")
+                wordlist.add(parsed_url.path.strip("/") + "/index.php")
+            return list(wordlist)
+
+        # Recursive scanning function
+        def recursive_scan(base_urls, required_successful_urls):
+            all_existing_urls = set(base_urls)
+            while len(all_existing_urls) < required_successful_urls:
+                wordlist = generate_wordlist_from_existing_urls(all_existing_urls)
+                st.write("Generated wordlist:", wordlist)
+                new_results = {"existing_urls": [], "non_existing_urls": []}
+                
+                progress_bar = st.progress(0)
+                total_urls = len(wordlist)
+                
+                with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
+                    future_to_url = {executor.submit(check_url_existence, path): path for path in wordlist}
+                    for idx, future in enumerate(concurrent.futures.as_completed(future_to_url)):
+                        url, exists = future.result()
+                        if exists:
+                            new_results["existing_urls"].append(url)
+                            all_existing_urls.add(url)
+                        else:
+                            new_results["non_existing_urls"].append(url)
+                        progress_bar.progress((idx + 1) / total_urls)
+                
+                st.write("Recursive scan results")
+                st.write("Existing URLs:")
+                for url in new_results["existing_urls"]:
+                    st.write(url)
+                
+                st.write("Non-Existing URLs:")
+                for url in new_results["non_existing_urls"]:
+                    st.write(url)
+
+                # Save new results
+                recursive_results_filename = f"{newpath}/recursive_results_{len(all_existing_urls)}.json"
+                with open(recursive_results_filename, "w") as f:
+                    json.dump(new_results, f, indent=4)
+                
+                # Update the summary file with the new results
+                with open(summary_filename, "r") as f:
+                    summary = json.load(f)
+                summary["successful_count"] += len(new_results["existing_urls"])
+                summary["unsuccessful_count"] += len(new_results["non_existing_urls"])
+                with open(summary_filename, "w") as f:
+                    json.dump(summary, f, indent=4)
+
+                if not new_results["existing_urls"]:
+                    break  # Stop if no new URLs are found
+
+            st.write(f"Total existing URLs found: {len(all_existing_urls)}")
+
+        # Define the required number of successful URLs
+        required_successful_urls = st.number_input("Enter the required number of successful URLs", min_value=1, step=1, value=100)
+
+        # Start recursive scan
+        recursive_scan(results["existing_urls"], required_successful_urls)
+                #Using the combined variable read the record one by one and combined with the domain name, try the URL exising or not, save it as JSON format 
+    #    for url in combined:        
+
+    #st.write("Step 10 : Combine 3 JSON of the wordlist generated, only left the part of paths")
+    #combine_path = f'{newpath}/wordlist_output'
+    #if not os.path.exists(combine_path):
+    #        combined = read_prompt("exe_one", "basic_web", "5_combine_wordlist", "Combine and return JSON only :" + software_tech_wordlist+wordlistoutput+general_ideas, "")  
+    #        #owasp_result_clean = clean_summary(owasp_result)
+    #        st.write(combined)
+    #        with open(combine_path, "w") as f:
+    #            f.write(combined)
+    #            st.write("Saved OWASP check results in " + combined)
+    #else:
+    #        combined = open(combine_path, 'r').read()
+    #        st.write(combined)
+    
+    # Step 1: Combine the wordlist with using LLM
+    #combined = hn_assistant.run("Combine the JSON, remove the domain part of the all URL, only keep the path, Return JSON format ONLY : " + wordlistoutput_clean + software_tech_wordlist, stream=False)
+    #combined = repair_and_load_json(combined)
+    ##st.write("Combined JSON:")
+    #st.write(combined)
+    #with open(combine, "w") as f:
+    #    f.write(json.dumps(combined, indent=4))
+    #    st.write("Saved combined wordlist output in " + combined)
+
+
+        
 

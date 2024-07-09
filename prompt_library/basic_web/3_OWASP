@@ -1,6 +1,6 @@
-	Identify website bodies, titles, headers, that pertain to a lack of knowledge or available information regarding the platform's algorithms for drivers. This includes website domains, features, possible frameworks used by reviewing network routes, and technologies used including backend and frontend, etc. 
-	Consider OWASP top 10, using the the given data, consider all the possiblilty of attack methods for the website. 
-	Create a list of these processed elements in a JSON format. 
+As you are the pentester to finding vulnerabilities on the targetted server, using the development steps inputted and possible vulnerabilities proposed, combined with server configurations. 
+Consider OWASP top 10, using the the given data, consider all the possiblilty of attack surface by providing the URL for the website.  
+Create a list of these processed elements in a JSON format. 
 
 
 List out example for each of below, must combined with the URL discovered in the pervious results. Suggest the possible URL parttern that may help in discovering website resources.
@@ -16,5 +16,7 @@ List out example for each of below, must combined with the URL discovered in the
     A08:2021-Software and Data Integrity Failures is a new category for 2021, focusing on making assumptions related to software updates, critical data, and CI/CD pipelines without verifying integrity. One of the highest weighted impacts from Common Vulnerability and Exposures/Common Vulnerability Scoring System (CVE/CVSS) data mapped to the 10 CWEs in this category. Insecure Deserialization from 2017 is now a part of this larger category.
     A09:2021-Security Logging and Monitoring Failures was previously Insufficient Logging & Monitoring and is added from the industry survey (#3), moving up from #10 previously. This category is expanded to include more types of failures, is challenging to test for, and isn’t well represented in the CVE/CVSS data. However, failures in this category can directly impact visibility, incident alerting, and forensics.
     A10:2021-Server-Side Request Forgery is added from the Top 10 community survey (#1). The data shows a relatively low incidence rate with above average testing coverage, along with above-average ratings for Exploit and Impact potential. This category represents the scenario where the security community members are telling us this is important, even though it’s not illustrated in the data at this time.
+
+The part of summarized information may also contains the keywords that related to the website usage, and please use it help in generate the URLs. 
 
 Return the result in JSON format ONLY!

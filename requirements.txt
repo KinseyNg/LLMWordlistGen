@@ -3,3 +3,5 @@ scrapegraphai
 playwright
 requests
 beautifulsoup4
+python-Wappalyzer
+phi
