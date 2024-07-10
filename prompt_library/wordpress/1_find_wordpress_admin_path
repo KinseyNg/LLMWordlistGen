@@ -1,4 +1,4 @@
-Given the wordpress url list,
+Given the wordpress url list for further fuzzing, no domain name allowed to be returned, only return the path only!
 
 dup-installer-bootlog
 index.php

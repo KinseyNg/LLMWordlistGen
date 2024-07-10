@@ -1,4 +1,4 @@
-Given the following fuzzing paths for php files, 
+Given the following fuzzing paths for php files, no domain name allowed to be returned, only return the path only!
 
 ._FUZZ.php
 .FUZZ.php.swm

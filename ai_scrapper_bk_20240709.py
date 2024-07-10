@@ -15,9 +15,8 @@ from dotenv import load_dotenv
 import json
 import shutil
 import concurrent.futures
-from urllib.parse import urlparse, urlunparse
+from urllib.parse import urlparse
 import sqlite3
-import time
 
 # Load the .env file
 load_dotenv()
@@ -43,7 +42,6 @@ def extract_html_structure(html):
     for script in soup(["script", "style"]):
         script.decompose()  # Remove script and style elements
     return str(soup)
-
 
 def is_similar_html(html1, html2, threshold=0.9):
     seq = difflib.SequenceMatcher(None, html1, html2)
@@ -75,27 +73,6 @@ def filter_unique_urls(urls, base_domain, similarity_threshold=0.9):
     
     return unique_urls
 
-def clean_url(input_url):
-    # Parse the input URL
-    parsed_url = urlparse(input_url)
-    
-    # Extract the scheme and netloc (domain)
-    scheme = parsed_url.scheme
-    netloc = parsed_url.netloc
-    
-    # If the scheme or netloc is empty, try extracting them manually
-    if not scheme or not netloc:
-        match = re.match(r'(http[s]?://)?([^/]+)', input_url)
-        if match:
-            scheme = match.group(1) if match.group(1) else 'http://'
-            netloc = match.group(2)
-    
-    # Ensure the scheme is 'http'
-    scheme = 'http'
-    
-    # Reconstruct the URL without duplicate domains or schemes
-    cleaned_url = urlunparse((scheme, netloc, '', '', '', ''))
-    
 def check_software_in_json(json_data, software_list):
     software_list_lower = [item.lower() for item in software_list]
     matched_software = {}
@@ -207,47 +184,6 @@ def repair_and_load_json(json_str, min_length=10):
 def generate_response(input_text):
     llm = OpenAI(temperature=0.7, openai_api_key=openai_access_token)
     return llm(input_text)
-# Define a function to read existing URLs from the database
-def read_existing_urls(db_path):
-    conn = sqlite3.connect(db_path)
-    cursor = conn.cursor()
-    
-    cursor.execute('SELECT url FROM successful_urls')
-    successful_urls = [row[0] for row in cursor.fetchall()]
-    
-    cursor.execute('SELECT url FROM unsuccessful_urls')
-    unsuccessful_urls = [row[0] for row in cursor.fetchall()]
-    
-    conn.close()
-    return successful_urls, unsuccessful_urls
-
-# Define a function to update the tried number in the database
-def update_tried_number(db_path, url):
-    conn = sqlite3.connect(db_path)
-    cursor = conn.cursor()
-    
-    cursor.execute('''
-        UPDATE successful_urls SET tried_count = tried_count + 1 WHERE url = ?
-    ''', (url,))
-    
-    cursor.execute('''
-        UPDATE unsuccessful_urls SET tried_count = tried_count + 1 WHERE url = ?
-    ''', (url,))
-    
-    conn.commit()
-    conn.close()
-
-# Define a function to generate more paths using the LLM
-def generate_more_paths(llm, existing_urls, related_technologies):
-    combined_content = "\n".join(existing_urls) + "\n".join(related_technologies)
-    additional_paths = llm(combined_content+"Given the URLs found on the URL, give 50 more suggestions, plaintext list of URL only", stream=False)
-    return additional_paths.split()
-
-# Define the maximum number of random wordlists to try
-MAX_RANDOM_WORDLIST_TRIES = 4000
-
-
-
 
 # Set up the Streamlit app
 st.title("LLM-Based Wordlist Generation Framework")
@@ -256,7 +192,7 @@ st.caption("by Kinsey v0.1")
 if openai_access_token:
     model = st.radio(
         "Select the model",
-        ["gpt-4-turbo", "gpt-4-1106-preview","gpt-4o"],
+        ["gpt-3.5-turbo-0125", "gpt-4", "gpt-4-1106-preview","gpt-4o"],
         index=0,
     )
     hn_assistant = Assistant(
@@ -307,7 +243,6 @@ if openai_access_token:
     )
     
     if st.button("Start"):
-        start_time = time.time()
         newpath = './output/' + urlinfo.netloc 
         # Remove the folder if the checkbox is ticked
         if remove_folder:
@@ -334,23 +269,13 @@ if openai_access_token:
         
         result = smart_scraper_graph.run()
 
-        #st.write(result["URL"])
+        st.write(result["URL"])
 
         st.write("Step 3 : Find the unique URL from step 2 output")
         st.write("Filtering unique URLs from the list of URLs extracted from the website")
-        #Check if saved unique url file exists, if yes, read the file instead of running the function
-        if os.path.exists(f"{newpath}/unique_urls.txt"):
-            with open(f"{newpath}/unique_urls.txt", "r") as f:
-                filtered_urls = f.read().split()
-        else:
-        
-            filtered_urls = filter_unique_urls(result["URL"], base_domain, 0.5) 
-            with open(f"{newpath}/unique_urls.txt", "w") as f:
-                for url in filtered_urls:
-                    f.write(url + "\n")
-        
-        #st.write("List of unique URLs")
-        #st.write(filtered_urls)
+        filtered_urls = filter_unique_urls(result["URL"], base_domain, 0.5) 
+        st.write("List of unique URLs")
+        st.write(filtered_urls)
 
         st.write("Step 4 : Crawl all the discovered URLs and save it HTML contents")
         scrapped_html_path = f'{newpath}/scrapped_html'
@@ -394,8 +319,8 @@ if openai_access_token:
                     progress = processed_files / total_files
                     my_bar.progress(progress, text=f"Analyzing progress: {int(progress * 100)}%")
 
-        #st.write("Summarized results")
-        #st.write(summarized_result)
+        st.write("Summarized results")
+        st.write(summarized_result)
 
         st.write("Step 6 : CoT for guessing the development process")
         cot_path = f'{newpath}/cot_results'
@@ -407,7 +332,7 @@ if openai_access_token:
                 st.write("Saved CoT results in " + cot_path)
         else:
             cot_result = open(cot_path, 'r').read()
-        #st.write(cot_result)
+        st.write(cot_result)
         
         st.write("Step 7 : Guess URL Structure")
         url_structure_path = f'{newpath}/url_structure_results'
@@ -434,7 +359,7 @@ if openai_access_token:
             
         else:
             url_structure_result = open(url_structure_path, 'r').read()
-        #st.write(url_structure_result)
+        st.write(url_structure_result)
 
 
         st.write("Step 8 : Run OWASP check")
@@ -447,7 +372,7 @@ if openai_access_token:
                 st.write("Saved OWASP check results in " + owasp_path)
         else:
             owasp_result = open(owasp_path, 'r').read()
-        #st.write(owasp_result)
+        st.write(owasp_result)
 
 
 
@@ -457,8 +382,8 @@ if openai_access_token:
                 wordpressprompt = f.read()
             combined_result = summarized_result + "\n" + cot_result + "\n" + owasp_result
             general_ideas = hn_assistant.run("Return plaintext list of URL only, no description : " + wordpressprompt + combined_result, stream=False)
-            #st.write("Generating Ideas")
-            #st.write(general_ideas)
+            st.write("Generating Ideas")
+            st.write(general_ideas)
             # Store the general ideas result
             with open(f"{newpath}/general_ideas_result.txt", "w") as f:
                 #Clean to pure JSON before write
@@ -468,8 +393,8 @@ if openai_access_token:
             with open("./prompt_library/wordlist_creation/2_suggests_filepath", 'r') as f:
                 wordlistprompt = f.read()
             wordlistoutput = hn_assistant.run("Return plaintext list of URL only, no description : " + wordlistprompt + general_ideas, stream=False)
-            #st.write("Generating Wordlist")
-            #st.write(wordlistoutput)
+            st.write("Generating Wordlist")
+            st.write(wordlistoutput)
             #Clean the wordlistoutput to JSON only
             wordlistoutput_clean = wordlistoutput
             # Store the wordlist output
@@ -479,14 +404,14 @@ if openai_access_token:
             # Read the existing general ideas result
             with open(f"{newpath}/general_ideas_result.txt", "r") as f:
                 general_ideas = f.read()
-            #st.write("Generating Ideas")
-            #st.write(general_ideas)
+            st.write("Generating Ideas")
+            st.write(general_ideas)
             
             # Read the existing wordlist output
             with open(f"{newpath}/wordlist_output.txt", "r") as f:
                 wordlistoutput = f.read()
-            #st.write("Generating Wordlist")
-            #st.write(wordlistoutput)      
+            st.write("Generating Wordlist")
+            st.write(wordlistoutput)      
     
 
         st.write("Step 8 : Wordlist Creator")
@@ -498,8 +423,8 @@ if openai_access_token:
 
         #If matched found, then run the prompt for the software for seeder
         if matched_software:
-            #st.write("Matched Software to start seeder:")
-            #st.write(matched_software)
+            st.write("Matched Software to start seeder:")
+            st.write(matched_software)
             for software in matched_software.keys():
                 st.write(f"Running prompts for {software}...")
                 software_prompts_path = os.path.join('./prompt_library', software.lower())
@@ -558,8 +483,8 @@ if openai_access_token:
                 CREATE TABLE IF NOT EXISTS scan_summary (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
-                    successful_count    ful_count INTEGER,
-                    unsuccessful_count  INTEGER
+                    success     ful_count INTEGER,
+                    unsuccessful_count INTEGER
                 )
             ''')
             conn.commit()
@@ -597,101 +522,73 @@ if openai_access_token:
 
         # Split the combined wordlist into individual URLs
         wordlist_urls = combined.split()
-        #Save the wordlist to a file as step10_wordlist.txt
-        #Check if the file exists, if yes, read the file when debugging is enabled
-        if os.path.exists(f"{newpath}/step10_wordlist.txt"):
 
-            with open(f"{newpath}/step10_wordlist.txt", "r") as f:
-                wordlist_urls = f.read()
-   
-
-        else:
         # Initialize the results dictionary
-            results = {"existing_urls": [], "non_existing_urls": []}
+        results = {"existing_urls": [], "non_existing_urls": []}
 
-        # Check if the successful_urls.txt exists, if yes, read the file and append to the results
-        if os.path.exists(f"{newpath}/successful_urls.txt"):
-            with open(f"{newpath}/successful_urls.txt", "r") as f:
-                results["existing_urls"] = f.read().split()
+        # Function to check if a URL exists
+        def check_url_existence(path):
+            st.write(f"Checking {urlinfo.netloc}")
+            full_url = f"http://{urlinfo.netloc}/{path.lstrip('/')}"
+            try:
+                response = requests.head(full_url, timeout=5)
+                if response.status_code == 200:
+                    return full_url, True
+                else:
+                    return full_url, False
+            except requests.RequestException:
+                return full_url, False
 
-        # Check if the unsuccessful_urls.txt exists, if yes, read the file and append to the results
-        if os.path.exists(f"{newpath}/unsuccessful_urls.txt"):
-            with open(f"{newpath}/unsuccessful_urls.txt", "r") as f:
-                results["non_existing_urls"] = f.read().split()
+        # Create a progress bar
+        progress_bar = st.progress(0)
+        total_urls = len(wordlist_urls)
 
-        # Check if the URL existence checking has already been completed
-        if len(results["existing_urls"]) + len(results["non_existing_urls"]) == len(wordlist_urls):
-            st.write("URL existence checking has already been completed.")
-        else:
-                    
+        # Use ThreadPoolExecutor to check URLs concurrently
+        with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
+            future_to_url = {executor.submit(check_url_existence, path): path for path in wordlist_urls}
+            for idx, future in enumerate(concurrent.futures.as_completed(future_to_url)):
+                url, exists = future.result()
+                if exists:
+                    results["existing_urls"].append(url)
+                else:
+                    results["non_existing_urls"].append(url)
+                # Update progress bar
+                progress_bar.progress((idx + 1) / total_urls)
 
-                    # Function to check if a URL exists
-            def check_url_existence(path):
-                        
-                        if path.startswith("http://") or path.startswith("https://"):
-                            full_url = path
-                        else:
-                            full_url = f"http://{urlinfo.netloc}/{path.lstrip('/')}"
-                        st.write(f"Checking {full_url}")
-                        try:
-                            response = requests.head(full_url, timeout=5)
-                            if response.status_code == 200:
-                                return full_url, True
-                            else:
-                                return full_url, False
-                        except requests.RequestException:
-                            return full_url, False
+        # Save the results to a file
+        results_filename = f"{newpath}/url_existence_results.json"
+        with open(results_filename, "w") as f:
+            json.dump(results, f, indent=4)
 
-            # Create a progress bar
-            progress_bar = st.progress(0)
-            total_urls = len(wordlist_urls)
+        # Save the successful URLs to a separate file
+        successful_urls_filename = f"{newpath}/successful_urls.txt"
+        with open(successful_urls_filename, "w") as f:
+            for url in results["existing_urls"]:
+                f.write(url + "\n")
 
-                # Use ThreadPoolExecutor to check URLs concurrently
-            with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
-                    future_to_url = {executor.submit(check_url_existence, path): path for path in wordlist_urls}
-                    for idx, future in enumerate(concurrent.futures.as_completed(future_to_url)):
-                        url, exists = future.result()
-                        if exists:
-                            results["existing_urls"].append(url)
-                        else:
-                            results["non_existing_urls"].append(url)
-                        # Update progress bar
-                        progress_bar.progress((idx + 1) / total_urls)
+        # Save the unsuccessful URLs to a separate file
+        unsuccessful_urls_filename = f"{newpath}/unsuccessful_urls.txt"
+        with open(unsuccessful_urls_filename, "w") as f:
+            for url in results["non_existing_urls"]:
+                f.write(url + "\n")
 
-                # Save the results to a file
-            results_filename = f"{newpath}/url_existence_results.json"
-            with open(results_filename, "w") as f:
-                json.dump(results, f, indent=4)
+        # Save the number of successful and unsuccessful URLs to a separate file
+        summary_filename = f"{newpath}/url_check_summary.json"
+        summary = {
+            "successful_count": len(results["existing_urls"]),
+            "unsuccessful_count": len(results["non_existing_urls"])
+        }
+        with open(summary_filename, "w") as f:
+            json.dump(summary, f, indent=4)
 
-            # Save the successful URLs to a separate file
-            successful_urls_filename = f"{newpath}/successful_urls.txt"
-            with open(successful_urls_filename, "w") as f:
-                for url in results["existing_urls"]:
-                        f.write(url + "\n")
+        # Save results to the database
+        save_results_to_database(db_path, results["existing_urls"], results["non_existing_urls"])
 
-                # Save the unsuccessful URLs to a separate file
-            unsuccessful_urls_filename = f"{newpath}/unsuccessful_urls.txt"
-            with open(unsuccessful_urls_filename, "w") as f:
-                for url in results["non_existing_urls"]:
-                    f.write(url + "\n")
-
-            # Save the number of successful and unsuccessful URLs to a separate file
-            summary_filename = f"{newpath}/url_check_summary.json"
-            summary = {
-                    "successful_count": len(results["existing_urls"]),
-                    "unsuccessful_count": len(results["non_existing_urls"])
-                }
-            with open(summary_filename, "w") as f:
-                    json.dump(summary, f, indent=4)
-
-            # Save results to the database
-            save_results_to_database(db_path, results["existing_urls"], results["non_existing_urls"])
-
-            st.write("URL existence checking completed.")
-            st.write(f"Results saved in {results_filename}")
-            st.write(f"Successful URLs saved in {successful_urls_filename}")
-            st.write(f"Unsuccessful URLs saved in {unsuccessful_urls_filename}")
-            st.write(f"Summary saved in {summary_filename}")
+        st.write("URL existence checking completed.")
+        st.write(f"Results saved in {results_filename}")
+        st.write(f"Successful URLs saved in {successful_urls_filename}")
+        st.write(f"Unsuccessful URLs saved in {unsuccessful_urls_filename}")
+        st.write(f"Summary saved in {summary_filename}")
 
         # List out the found URLs
         st.write("Existing URLs:")
@@ -701,71 +598,6 @@ if openai_access_token:
         st.write("Non-Existing URLs:")
         for url in results["non_existing_urls"]:
             st.write(url)
-# Step 12: Read existing URLs from the database
-    #db_path = f"{newpath}/url_scan_results.db"
-    #successful_urls, unsuccessful_urls = read_existing_urls(db_path)
-    #st.write("Existing URLs:", successful_urls)
-    st.write("Step 12: Read existing URLs from the database")
-    tried_count = 0
-    successful_urls = []
-    unsuccessful_urls = []
-    while tried_count < 1000:
-        
-    #    st.write(f"Attempt {tried_count + 1}/{MAX_RANDOM_WORDLIST_TRIES}")
-    #    st.write("successful_urls : " , successful_urls)
-    #    st.write("matched_software.keys() " , matched_software.keys())
-        #successful_urls, unsuccessful_urls = read_existing_urls(db_path)
-        successful_urls = [url for url in successful_urls if url is not None]
-        additional_paths = generate_more_paths(hn_assistant.run, "Herewith the workable URLs :"+ "\n".join(successful_urls)+ "\n".join(results["existing_urls"])+"Using the URL found on the website, give 50 more suggestions that would help in discover possible vulnerablities on the server, plaintext URL only, no number, no other information. Also refered to the summarized information of the target : "+combined_result+'NO EXAMPLE.COM, use the original domain name', matched_software.keys())
-        #st.write("Additional paths generated:")
-        #st.write("Output debug : "+additional_paths)
-        #count the number of rows additional paths
-        #Clean the array only web paths, remove all the components that not in URL format
-        additional_paths = [path for path in additional_paths if path.startswith("http://") or path.startswith("https://")]
-        numberofrow=len(additional_paths)
-        st.write(len(additional_paths))
-        tried_count=numberofrow+tried_count
-        st.write("Total tried count : ", tried_count)
-
-        # Check if the URLs exist
-        for path in additional_paths:
-            if path in successful_urls or path in unsuccessful_urls:
-                continue
-
-            full_url = f"http://{urlinfo.netloc}/{path.lstrip('/')}"
-            full_url = clean_url(full_url)
-            exists = check_url_existence(path)[1]
-
-            if exists:
-                successful_urls.append(full_url)
-                #full url is a variable not a list, is it OK? 
-                
-                
-                st.write(f"URL exists: {full_url}")
-            else:
-                unsuccessful_urls.append(full_url)
-                
-                st.write(f"URL does not exist: {full_url}")
-
-    save_results_to_database(db_path, successful_urls, [])
-    save_results_to_database(db_path, [], unsuccessful_urls)
-    end_time = time.time()
-    duration = end_time - start_time
-    st.write(f"Total time taken to complete the program: {duration:.2f} seconds")
-    #        #update_tried_number(db_path, full_url)
-    #        #tried_count += 1
-
-    #    tried_count += 1
-
-    # Save results to the database after the loop
-    #save_results_to_database(db_path, successful_urls, unsuccessful_urls)
-
-    #st.write("URL existence checking completed after additional tries.")
-    #st.write("Existing URLs:", successful_urls)
-    #st.write("Non-Existing URLs:", unsuccessful_urls)
-
-# Ensure the 'tried_count' column exists in the database
-    
 
 
 
